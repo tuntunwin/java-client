@@ -6,11 +6,6 @@ See License.txt in the project root for license information.
 
 package microsoft.aspnet.signalr.client.transport;
 
-import java.io.UnsupportedEncodingException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URLEncoder;
-
 import com.google.gson.Gson;
 
 import org.java_websocket.client.WebSocketClient;
@@ -18,6 +13,11 @@ import org.java_websocket.exceptions.InvalidDataException;
 import org.java_websocket.framing.Framedata;
 import org.java_websocket.handshake.ServerHandshake;
 import org.java_websocket.util.Charsetfunctions;
+
+import java.io.UnsupportedEncodingException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URLEncoder;
 
 import microsoft.aspnet.signalr.client.ConnectionBase;
 import microsoft.aspnet.signalr.client.LogLevel;
@@ -61,9 +61,14 @@ public class WebsocketTransport extends HttpClientTransport {
 
         final String transport = getName();
         final String connectionToken = connection.getConnectionToken();
-        final String messageId = connection.getMessageId() != null ? connection.getMessageId() : "";
+        /*final String messageId = connection.getMessageId() != null ? connection.getMessageId() : "";
         final String groupsToken = connection.getGroupsToken() != null ? connection.getGroupsToken() : "";
-        final String connectionData = connection.getConnectionData() != null ? connection.getConnectionData() : "";
+        final String connectionData = connection.getConnectionData() != null ? connection.getConnectionData() : "";*/
+
+        //Modify by mcs
+        String messageId = connection.getMessageId(); if(messageId == null) messageId = "";
+        String groupsToken = connection.getGroupsToken();if(groupsToken == null) groupsToken = "";
+        String connectionData = connection.getConnectionData(); if(connectionData == null) connectionData = "";
 
 
         String url = null;
@@ -73,7 +78,8 @@ public class WebsocketTransport extends HttpClientTransport {
                     + "&connectionToken=" + URLEncoder.encode(URLEncoder.encode(connectionToken, "UTF-8"), "UTF-8")
                     + "&groupsToken=" + URLEncoder.encode(groupsToken, "UTF-8")
                     + "&messageId=" + URLEncoder.encode(messageId, "UTF-8")
-                    + "&transport=" + URLEncoder.encode(transport, "UTF-8");
+                    + "&transport=" + URLEncoder.encode(transport, "UTF-8")
+                    + "&" + connection.getQueryString(); //Modify by mcs
         } catch (UnsupportedEncodingException e) {
             e.printStackTrace();
         }
@@ -108,6 +114,7 @@ public class WebsocketTransport extends HttpClientTransport {
             @Override
             public void onError(Exception e) {
                 mWebSocketClient.close();
+                mConnectionFuture.triggerError(e); //Modify by mcs
             }
 
             @Override

@@ -73,7 +73,7 @@ public class StreamResponse implements Response {
             sb.append(line);
             sb.append("\n");
         }
-
+        mReader.close(); //Modify by mcs
         return sb.toString();
     }
 

@@ -6,14 +6,16 @@ See License.txt in the project root for license information.
 
 package microsoft.aspnet.signalr.client;
 
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
-
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import microsoft.aspnet.signalr.client.http.Request;
 import microsoft.aspnet.signalr.client.transport.AutomaticTransport;
@@ -22,7 +24,6 @@ import microsoft.aspnet.signalr.client.transport.ConnectionType;
 import microsoft.aspnet.signalr.client.transport.DataResultCallback;
 import microsoft.aspnet.signalr.client.transport.NegotiationResponse;
 import microsoft.aspnet.signalr.client.transport.TransportHelper;
-import microsoft.aspnet.signalr.client.Logger;
 
 /**
  * Represents a basic SingalR connection
@@ -67,7 +68,8 @@ public class Connection implements ConnectionBase {
 
     private Runnable mOnConnectionSlow;
 
-    private Runnable mOnClosed;
+    //private Runnable mOnClosed;
+    private List<Runnable> mOnClosed = new ArrayList<Runnable>(); //Modify by mcs
 
     private StateChangedCallback mOnStateChanged;
 
@@ -245,7 +247,9 @@ public class Connection implements ConnectionBase {
 
     @Override
     public void closed(Runnable handler) {
-        mOnClosed = handler;
+        //mOnClosed = handler;
+        //Modify by mcs
+        mOnClosed.add(handler);
     }
 
     @Override
@@ -787,8 +791,10 @@ public class Connection implements ConnectionBase {
      * Triggers the Closed event
      */
     protected void onClosed() {
-        if (mOnClosed != null) {
-            mOnClosed.run();
+        //if (mOnClosed != null) mOnClosed.run(); //Origin code
+        //Modify by mcs
+        for(Runnable runnable: mOnClosed){
+            runnable.run();
         }
     }
 

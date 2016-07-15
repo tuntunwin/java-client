@@ -1,0 +1,19 @@
+~ Modified History ~
+Comment -> Modify by mcs
+
+StreamResponse.java
+	To fix TCP remote port TIME_WAITE issue
+		    1) Close buffer reader after reading in "readToEnd" method
+
+WebsocketTransport.java
+ 	In "start" method
+ 			1) Add query string to url
+			2) Remove duplicate function call
+			3) Add triggerError on WebSocketClient error
+
+Connection.java
+	To handle connection close event
+			1) Modify object Runnable to List object Runnable
+			2) Add handler to List object in "closed" method
+			3) Modify to execute Runnable list in "onClosed" method
+
