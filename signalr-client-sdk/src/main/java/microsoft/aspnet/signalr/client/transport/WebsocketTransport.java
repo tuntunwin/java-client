@@ -31,8 +31,9 @@ import microsoft.aspnet.signalr.client.http.HttpConnection;
  * Created by stas on 07/07/14.
  */
 public class WebsocketTransport extends HttpClientTransport {
-
+    private int msgFrame = 0;
     private String mPrefix;
+    private String mContent;
     private static final Gson gson = new Gson();
     WebSocketClient mWebSocketClient;
     private UpdateableCancellableFuture<Void> mConnectionFuture;
@@ -66,9 +67,12 @@ public class WebsocketTransport extends HttpClientTransport {
         final String connectionData = connection.getConnectionData() != null ? connection.getConnectionData() : "";*/
 
         //Modify by mcs
-        String messageId = connection.getMessageId(); if(messageId == null) messageId = "";
-        String groupsToken = connection.getGroupsToken();if(groupsToken == null) groupsToken = "";
-        String connectionData = connection.getConnectionData(); if(connectionData == null) connectionData = "";
+        String messageId = connection.getMessageId();
+        if (messageId == null) messageId = "";
+        String groupsToken = connection.getGroupsToken();
+        if (groupsToken == null) groupsToken = "";
+        String connectionData = connection.getConnectionData();
+        if (connectionData == null) connectionData = "";
 
 
         String url = null;
@@ -122,29 +126,57 @@ public class WebsocketTransport extends HttpClientTransport {
                 try {
                     String decodedString = Charsetfunctions.stringUtf8(frame.getPayloadData());
 
-                    if(decodedString.equals("]}")){
+                    /*if (decodedString.equals("]}")) {
                         return;
                     }
-
-                    if(decodedString.endsWith(":[") || null == mPrefix){
+                    if (decodedString.endsWith(":[") || null == mPrefix) {
                         mPrefix = decodedString;
                         return;
                     }
-
                     String simpleConcatenate = mPrefix + decodedString;
-
-                    if(isJSONValid(simpleConcatenate)){
+                    if (isJSONValid(simpleConcatenate)) {
                         onMessage(simpleConcatenate);
-                    }else{
+                    } else {
                         String extendedConcatenate = simpleConcatenate + "]}";
                         if (isJSONValid(extendedConcatenate)) {
                             onMessage(extendedConcatenate);
                         } else {
-                            log("invalid json received:" + decodedString, LogLevel.Critical);
+                            log("Invalid json received -> " + decodedString, LogLevel.Critical);
                         }
+                    }*/
+
+                    //Modify by mcs
+                    //->  ->  ->    1st Frame          2nd Frame             3rd Frame
+                    //Frame flow : 1.0,2,2.5 ->     2.5,3.0,4.5 ->      2.5,3.0,4.5,5.0,6.0
+                    // 1st Frame include (Prefix:1.0 + Content:2,2.5)
+                    msgFrame += 1;
+                    if (decodedString.contains("{\"R\":") || null == mPrefix) {
+                        mPrefix = decodedString;
+                        log("Frame:"+ msgFrame +", PrefixData -> " + mPrefix, LogLevel.Information);
+                        return;
+                    }
+                    mContent = (mContent == null) ? decodedString : mContent + decodedString;
+                    log("Frame:"+ msgFrame +", Content -> " + mContent, LogLevel.Information);
+                    if (decodedString.contains(",\"I\":\"")) {
+                        String simpleConcatenate = mPrefix + mContent;
+                        log("Last Frame:"+ msgFrame +", FullContent -> " + simpleConcatenate , LogLevel.Information);
+                        if (isJSONValid(simpleConcatenate)) {
+                            onMessage(simpleConcatenate);
+                        } else {
+                            String extendedConcatenate = simpleConcatenate + "]}";
+                            if (isJSONValid(extendedConcatenate)) {
+                                onMessage(extendedConcatenate);
+                            } else {
+                                String errorMsg = "Invalid json received -> " + decodedString;
+                                log(errorMsg, LogLevel.Critical);
+                                onError(new Exception(errorMsg));
+                            }
+                        }
+                        mContent = "";
                     }
                 } catch (InvalidDataException e) {
                     e.printStackTrace();
+                    mContent = "";
                 }
             }
         };
@@ -166,11 +198,11 @@ public class WebsocketTransport extends HttpClientTransport {
         return new UpdateableCancellableFuture<Void>(null);
     }
 
-    private boolean isJSONValid(String test){
+    private boolean isJSONValid(String test) {
         try {
             gson.fromJson(test, Object.class);
             return true;
-        } catch(com.google.gson.JsonSyntaxException ex) {
+        } catch (com.google.gson.JsonSyntaxException ex) {
             return false;
         }
     }
