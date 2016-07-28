@@ -10,6 +10,7 @@ WebsocketTransport.java
  			1) Add query string to url
 			2) Remove duplicate function call
 			3) Add triggerError on WebSocketClient error
+			4) Modify in websocket message frame handle
 
 Connection.java
 	To handle connection close event
