@@ -107,6 +107,7 @@ public class WebsocketTransport extends HttpClientTransport {
 
             @Override
             public void onMessage(String s) {
+                clearRecentMsgInstance();
                 callback.onData(s);
             }
 
@@ -121,45 +122,26 @@ public class WebsocketTransport extends HttpClientTransport {
                 mConnectionFuture.triggerError(e); //Modify by mcs
             }
 
+            private boolean isListener = true;
             @Override
             public void onFragment(Framedata frame) {
                 try {
+                    msgFrame += 1;
                     String decodedString = Charsetfunctions.stringUtf8(frame.getPayloadData());
 
-                    /*if (decodedString.equals("]}")) {
-                        return;
-                    }
-                    if (decodedString.endsWith(":[") || null == mPrefix) {
-                        mPrefix = decodedString;
-                        return;
-                    }
-                    String simpleConcatenate = mPrefix + decodedString;
-                    if (isJSONValid(simpleConcatenate)) {
-                        onMessage(simpleConcatenate);
-                    } else {
-                        String extendedConcatenate = simpleConcatenate + "]}";
-                        if (isJSONValid(extendedConcatenate)) {
-                            onMessage(extendedConcatenate);
-                        } else {
-                            log("Invalid json received -> " + decodedString, LogLevel.Critical);
-                        }
-                    }*/
+                    if (mPrefix == null && decodedString.contains("{\"R\":")) isListener = false;
+                    else if(mPrefix == null && decodedString.contains("{\"C\":")) isListener = true;
 
-                    //Modify by mcs
-                    //->  ->  ->    1st Frame          2nd Frame             3rd Frame
-                    //Frame flow : 1.0,2,2.5 ->     2.5,3.0,4.5 ->      2.5,3.0,4.5,5.0,6.0
-                    // 1st Frame include (Prefix:1.0 + Content:2,2.5)
-                    msgFrame += 1;
-                    if (decodedString.contains("{\"R\":") || null == mPrefix) {
-                        mPrefix = decodedString;
-                        log("Frame:"+ msgFrame +", PrefixData -> " + mPrefix, LogLevel.Information);
-                        return;
-                    }
-                    mContent = (mContent == null) ? decodedString : mContent + decodedString;
-                    log("Frame:"+ msgFrame +", Content -> " + mContent, LogLevel.Information);
-                    if (decodedString.contains(",\"I\":\"")) {
-                        String simpleConcatenate = mPrefix + mContent;
-                        log("Last Frame:"+ msgFrame +", FullContent -> " + simpleConcatenate , LogLevel.Information);
+                    if(isListener) {
+                        log("onFragment Frame:"+ msgFrame +", Listener message -> " + decodedString, LogLevel.Information);
+                        if (decodedString.equals("]}")) {
+                            return;
+                        }
+                        if (decodedString.endsWith(":[") || null == mPrefix) {
+                            mPrefix = decodedString;
+                            return;
+                        }
+                        String simpleConcatenate = mPrefix + decodedString;
                         if (isJSONValid(simpleConcatenate)) {
                             onMessage(simpleConcatenate);
                         } else {
@@ -167,19 +149,46 @@ public class WebsocketTransport extends HttpClientTransport {
                             if (isJSONValid(extendedConcatenate)) {
                                 onMessage(extendedConcatenate);
                             } else {
-                                String errorMsg = "Invalid json received -> " + decodedString;
-                                log(errorMsg, LogLevel.Critical);
-                                onError(new Exception(errorMsg));
+                                log("onFragment Invalid json received -> " + decodedString, LogLevel.Critical);
                             }
                         }
-                        mContent = "";
+                    }else {
+                        //Modify by mcs
+                        //->  ->  ->    1st Frame          2nd Frame             3rd Frame
+                        //Frame flow : 1.0,2,2.5 ->     2.5,3.0,4.5 ->      2.5,3.0,4.5,5.0,6.0
+                        //1st Frame include (Prefix:1.0 + Content:2,2.5)
+                        log("onFragment Frame:"+ msgFrame +", Invoked message -> " + decodedString, LogLevel.Information);
+                        if (decodedString.contains("{\"R\":") || null == mPrefix) {
+                            mPrefix = decodedString;
+                            log("onFragment Frame:"+ msgFrame +", PrefixData -> " + mPrefix, LogLevel.Information);
+                            return;
+                        }
+                        mContent = (mContent == null) ? decodedString : mContent + decodedString;
+                        log("onFragment Frame:"+ msgFrame +", Content -> " + mContent, LogLevel.Information);
+                        if (decodedString.contains(",\"I\":\"")) {
+                            String simpleConcatenate = mPrefix + mContent;
+                            log("onFragment Last Frame:"+ msgFrame +", FullContent -> " + simpleConcatenate , LogLevel.Information);
+                            if (isJSONValid(simpleConcatenate)) {
+                                onMessage(simpleConcatenate);
+                            } else {
+                                String extendedConcatenate = simpleConcatenate + "]}";
+                                if (isJSONValid(extendedConcatenate)) {
+                                    onMessage(extendedConcatenate);
+                                } else {
+                                    String errorMsg = "onFragment Invalid json received -> " + decodedString;
+                                    log(errorMsg, LogLevel.Critical);
+                                    onError(new Exception(errorMsg));
+                                }
+                            }
+                        }
                     }
                 } catch (InvalidDataException e) {
+                    clearRecentMsgInstance();
                     e.printStackTrace();
-                    mContent = "";
                 }
             }
         };
+
         mWebSocketClient.connect();
 
         connection.closed(new Runnable() {
@@ -205,5 +214,11 @@ public class WebsocketTransport extends HttpClientTransport {
         } catch (com.google.gson.JsonSyntaxException ex) {
             return false;
         }
+    }
+
+    private void clearRecentMsgInstance(){
+        msgFrame = 0;
+        mPrefix = null;
+        mContent = null;
     }
 }
