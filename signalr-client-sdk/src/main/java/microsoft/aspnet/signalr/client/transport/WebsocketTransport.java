@@ -20,7 +20,6 @@ import java.net.URISyntaxException;
 import java.net.URLEncoder;
 
 import microsoft.aspnet.signalr.client.ConnectionBase;
-import microsoft.aspnet.signalr.client.LogLevel;
 import microsoft.aspnet.signalr.client.Logger;
 import microsoft.aspnet.signalr.client.SignalRFuture;
 import microsoft.aspnet.signalr.client.UpdateableCancellableFuture;
@@ -100,6 +99,7 @@ public class WebsocketTransport extends HttpClientTransport {
         }
 
         mWebSocketClient = new WebSocketClient(uri) {
+
             @Override
             public void onOpen(ServerHandshake serverHandshake) {
                 mConnectionFuture.setResult(null);
@@ -122,65 +122,19 @@ public class WebsocketTransport extends HttpClientTransport {
                 mConnectionFuture.triggerError(e); //Modify by mcs
             }
 
-            private boolean isListener = true;
+            private StringBuffer mBuffer = new StringBuffer();
             @Override
             public void onFragment(Framedata frame) {
                 try {
-                    msgFrame += 1;
+                    // read all data as UTF-8
                     String decodedString = Charsetfunctions.stringUtf8(frame.getPayloadData());
-
-                    if (mPrefix == null && decodedString.contains("{\"R\":")) isListener = false;
-                    else if(mPrefix == null && decodedString.contains("{\"C\":")) isListener = true;
-
-                    if(isListener) {
-                        log("onFragment Frame:"+ msgFrame +", Listener message -> " + decodedString, LogLevel.Information);
-                        if (decodedString.equals("]}")) {
-                            return;
-                        }
-                        if (decodedString.endsWith(":[") || null == mPrefix) {
-                            mPrefix = decodedString;
-                            return;
-                        }
-                        String simpleConcatenate = mPrefix + decodedString;
-                        if (isJSONValid(simpleConcatenate)) {
-                            onMessage(simpleConcatenate);
-                        } else {
-                            String extendedConcatenate = simpleConcatenate + "]}";
-                            if (isJSONValid(extendedConcatenate)) {
-                                onMessage(extendedConcatenate);
-                            } else {
-                                log("onFragment Invalid json received -> " + decodedString, LogLevel.Critical);
-                            }
-                        }
-                    }else {
-                        //Modify by mcs
-                        //->  ->  ->    1st Frame          2nd Frame             3rd Frame
-                        //Frame flow : 1.0,2,2.5 ->     2.5,3.0,4.5 ->      2.5,3.0,4.5,5.0,6.0
-                        //1st Frame include (Prefix:1.0 + Content:2,2.5)
-                        log("onFragment Frame:"+ msgFrame +", Invoked message -> " + decodedString, LogLevel.Information);
-                        if (decodedString.contains("{\"R\":") || null == mPrefix) {
-                            mPrefix = decodedString;
-                            log("onFragment Frame:"+ msgFrame +", PrefixData -> " + mPrefix, LogLevel.Information);
-                            return;
-                        }
-                        mContent = (mContent == null) ? decodedString : mContent + decodedString;
-                        log("onFragment Frame:"+ msgFrame +", Content -> " + mContent, LogLevel.Information);
-                        if (decodedString.contains(",\"I\":\"")) {
-                            String simpleConcatenate = mPrefix + mContent;
-                            log("onFragment Last Frame:"+ msgFrame +", FullContent -> " + simpleConcatenate , LogLevel.Information);
-                            if (isJSONValid(simpleConcatenate)) {
-                                onMessage(simpleConcatenate);
-                            } else {
-                                String extendedConcatenate = simpleConcatenate + "]}";
-                                if (isJSONValid(extendedConcatenate)) {
-                                    onMessage(extendedConcatenate);
-                                } else {
-                                    String errorMsg = "onFragment Invalid json received -> " + decodedString;
-                                    log(errorMsg, LogLevel.Critical);
-                                    onError(new Exception(errorMsg));
-                                }
-                            }
-                        }
+                    // add string to buffer
+                    mBuffer.append(decodedString);
+                    // if this is final frame
+                    if(frame.isFin()) {
+                        String message = mBuffer.toString();
+                        mBuffer = new StringBuffer();
+                        onMessage(message);
                     }
                 } catch (InvalidDataException e) {
                     clearRecentMsgInstance();

@@ -1,0 +1,70 @@
+// SignalR Message test method for ICLHub class 
+        public async Task<String> GetSampleString() {
+            await Task.Delay(10);
+            var data = String.Join(",", Enumerable.Range(1, 1000).Select(i => i.ToString()));
+            Logger.Info("SampleString reply to SessionID:{0} has got {1} items.", SessionId, data.Length);
+            return data;
+        }
+
+        public async Task<String[]> GetSampleArray() {
+            await Task.Delay(10);
+            String[] data = Enumerable.Range(1, 1000).Select(i => i.ToString()).ToArray();
+            Logger.Info("SampleArray reply to SessionID:{0} has got {1} items.", SessionId, data.Length);
+            return data;
+        }
+
+        public async Task<MasterCameraInfo> GetSampleMasterCameraObject() {
+            await Task.Delay(10);
+            MasterCameraInfo camInfo = new MasterCameraInfo();
+
+            camInfo.CameraId = 1;
+            camInfo.CameraName = "Camera-1";
+            camInfo.AgencyId = 123;
+            camInfo.Altitude = 0.0;
+            camInfo.Latitude = 1.0;
+            camInfo.Longitude = 2.0;
+            camInfo.PostalCode = 12345;
+            camInfo.Region = "Region-1";
+            camInfo.LocationDescriptor1 = "In Region 1";
+            camInfo.CameraType = Models.CameraType.Digital;
+            camInfo.CameraGroup = "TestCam1";
+            camInfo.AccessRight = new Models.AccessRight();
+
+            var json = JsonConvert.SerializeObject(camInfo);
+            Logger.Info("SampleMasterCameraInfo reply to SessionID:{0} has got {1} master cameras.", SessionId, camInfo.ToString());
+            return camInfo;
+        }
+
+        public async Task<List<MasterCameraInfo>> GetSampleMasterCameraList() {
+            await Task.Delay(10);
+            List<MasterCameraInfo> camInfos = Enumerable.Range(1, 100).Select(i => {
+                MasterCameraInfo info = new MasterCameraInfo();
+                info.CameraId = i;
+                info.CameraName = "Camera-" + i;
+                info.AgencyId = i * 7;
+                info.Altitude = 0.0;
+                info.Latitude = 1.0;
+                info.Longitude = 2.0;
+                info.PostalCode = 12345;
+                info.Region = "Region-" + i;
+                info.LocationDescriptor1 = "In Region " + i;
+                info.CameraType = Models.CameraType.Digital;
+                info.CameraGroup = "TestCam";
+                info.AccessRight = new Models.AccessRight();
+                return info;
+            }).ToList();
+
+            var json = JsonConvert.SerializeObject(camInfos);
+            Logger.Info("SampleMasterCameraInfo reply to SessionID:{0} has got {1} master cameras.", SessionId, camInfos.Count());
+            return camInfos;
+        }
+
+        public async Task StartHubMethodHandler() {            
+            using (var client = new CommGatewayControllerServiceClient()) {
+                var userSessionInfo = await client.GetUserSessionAsync(SessionId);
+                await this.Clients.Group(userSessionInfo.UserId.ToString()).SyncString(await GetSampleString());
+                await this.Clients.Group(userSessionInfo.UserId.ToString()).SyncStringArray(await GetSampleArray());
+                await this.Clients.Group(userSessionInfo.UserId.ToString()).SyncMasterCameras(await GetSampleMasterCameraList());
+                Logger.Info("CameraACL Changed, userId: {0}", userSessionInfo.UserId.ToString());
+            }
+        }
